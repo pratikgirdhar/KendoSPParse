@@ -1,0 +1,255 @@
+<html>
+    <link href="https://kendo.cdn.telerik.com/2020.1.114/styles/kendo.common.min.css" rel="stylesheet">
+    <link href="https://kendo.cdn.telerik.com/2020.1.114/styles/kendo.metro.min.css" rel="stylesheet">
+    <link href="https://kendo.cdn.telerik.com/2020.1.114/styles/kendo.metro.mobile.min.css" rel="stylesheet">
+
+
+<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>-->
+
+<!-- Kendo Grid Requirement-->
+<script src="https://kendo.cdn.telerik.com/2020.1.114/js/jquery.min.js"></script> <!-- jszip required for export to excel--> 
+<script src="https://kendo.cdn.telerik.com/2018.2.620/js/jszip.min.js"></script>  
+<script src="https://kendo.cdn.telerik.com/2020.1.114/js/kendo.all.min.js"></script>
+<!-- Kendo Requirement Ends-->
+    
+ <script type="text/javascript">  
+     $(document).ready(function() {  
+         getUserInformation();  
+     });  
+    
+    
+function getUserInformation() { 
+    $.ajax({ 
+        method: 'GET', 
+        url: "http://intranet/auditletter/_api/web/lists/Getbytitle('Workflow%20Tasks')/items?$filter=((Status%20eq%20%27Not%20Started%27)%20or%20(Status%20eq%20%27Completed%27)%20or%20(Status%20eq%20%27In%20Progress%27))&$select=ID,Title,Status,Created,DueDate,ApproverComments&$expand=AssignedTo&$select=AssignedTo/FirstName,AssignedTo/LastName,AssignedTo/UserName&$top=5000&$orderby=Created desc", 
+        headers: { 
+            "accept": "application/json;odata=verbose",
+            "content-type": "application/json;odata=verbose",
+        }, 
+
+         parameterMap: function(options, operation) {
+                               if (operation !== "read" && options.models) {
+                                   return {models: kendo.stringify(options.models)};
+                               }
+                           },
+
+        success: mySuccHandler,
+		error: myErrHandler
+    });
+
+    function mySuccHandler(response) {
+console.log(response);
+
+try{
+    var data = response
+$("#grid").kendoGrid({
+    
+    toolbar:[
+        { name:"excel"},
+        { name:"search"},
+            ],
+    excel: {
+        filename: "KendoGrid.xlsx",
+    },
+    dataSource: {
+        data: response.d.results,
+        pageSize: 20,
+        
+    
+    schema:{
+        
+        model: {
+           id:"ID",
+            fields:{
+                Title: {type: "string"},
+                Created: {type:"date"},
+                DueDate: {type:"date"},
+                Status:{type:"string"},
+                //UserName:{type:"string"},
+                ApproverComments:{type:"string"},
+            }
+        }
+    },
+},
+filterable: true,
+sortable: true,
+groupable: true,
+pageable: true,
+
+dataBound: function () {
+var grid = this;
+var trs = this.tbody.find('tr').each(function(){
+var item = grid.dataItem($(this));
+if(item.Status == "Completed") {
+    $(this).find('.k-grid-edit,.k-grid-delete').hide();
+}
+
+
+});
+
+
+},
+
+columns : [
+{
+        field:"AssignedTo.FirstName",
+        title:"ContactName",
+        template: "<div class='customer-photo'" +
+                    "style='background-image: url(http://imageloader/rspil.aspx?UserId=#: AssignedTo.UserName #);'></div>" +
+                    "<div class='customer-name'>#: AssignedTo.FirstName # #= AssignedTo.LastName #</div>",
+        
+    },
+
+    {
+      field: "ID",
+      title: "SharePoint ID"
+    },
+    {
+    field: "Title",
+    title: "Tile",
+    encoded: false,
+    filterable: true,
+    sortable:true,
+
+},
+{
+field:"Created",
+title: "Created Date",
+template: '#= kendo.toString(kendo.parseDate(Created), "MM/dd/yyyy")#',
+},
+{
+
+field:"DueDate",
+title: "Due Date",
+template: '#= kendo.toString(kendo.parseDate(DueDate), "MM/dd/yyyy")#',
+},
+
+
+{
+field:"Status",
+title:"Workflow Status",
+},
+{
+field:"ApproverComments",
+title:"Approver Comments",
+width:300,
+encoded:false,
+template: '#if(ApproverComments!==null){# # var myContent =ApproverComments; #  # var dcontent = myContent.match(/^[^:]*/); # <span>#=kendo.toString(dcontent)#</span> #}else{# <span>##</span> #}#'
+},
+{ command: [{name:"edit",text:{edit:"Delegate Task"}},], title: "&nbsp;",editor:customBoolEditor, },
+
+
+],
+editable: "popup",
+
+edit: function(e) {
+    var container = e.container;
+   e.container.kendoWindow("title", "Click on Update Button to Delegate Task");
+   container.css("background-color", "#90EE90");
+   $('[name="AssignedTo.FirstName"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="ID"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="Title"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="Created"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="DueDate"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="Status"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+   $('[name="ApproverComments"]').attr("readonly", true).css('background-color' , '#DEDEDE');
+
+    $(e.container).find(".k-grid-update").click(
+        function () {
+
+        var eFirstName = container.find("input[name='ContactName']").val();
+        var ID = container.find("input[name='ID']").val();
+        //var eLastName = container.find("input[name='LastName']").val();
+        //var eJobTitle = container.find("input[name='JobTitle']").val();
+        var tasklistname = "Workflow Tasks";
+        var username = "pgirdhar@wiley.law";
+        var sendnotification="1";
+        var res = confirm("SuccessFully Updated!");
+        if(!res) {
+            event.preventDefault();
+            return false
+        }
+        //alert(ID);
+        //alert(tasklistname);
+        //alert(username);
+        //alert(sendnotification);
+        var apiPath = "http://intranet/auditletter/_api/web/lists/Getbytitle('DelegationTask')/items";
+$.ajax({
+       url: apiPath,
+       type: "POST",
+       headers: {  
+            "accept":"application/json;odata=verbose",
+        "content-type": "application/json;odata=verbose",
+     "X-RequestDigest": $("#__REQUESTDIGEST").val(),
+}, 
+data: JSON.stringify({  
+            '__metadata':{'type': 'SP.Data.DelegationTaskListItem'},
+            
+            
+            'Title': ID,
+            //'taskListname':tasklistname,
+            //'targetUsername':username,
+            
+        }),
+        success: function(data) {  
+            //alert("Item updated successfully");  
+            console.log("Task Delegated Successfully!");
+        },
+      error:function(error) {
+          console.log(JSON.stringify(error));
+      }
+
+
+    });
+        
+        
+        }
+  
+
+
+
+)
+
+}
+
+
+});
+
+}
+catch(e){
+alert(e.message);
+}
+
+}
+function myErrHandler(data, errMessage) {    
+    alert("Error: " + errMessage);    
+}
+function customBoolEditor(container, options) {
+    var guid = kendo.guid();
+    //$('<input class="k-checkbox" id="' + guid + '" type="checkbox" name="Discontinued" data-type="boolean" data-bind="checked:Discontinued">').appendTo(container);
+    $('<label class="k-checkbox-label" for="' + guid + '">&#8203;</label>').appendTo(container);
+}
+}		 
+</script>
+</html>
+<div id="grid"></div>
+<style type="text/css">
+    .customer-photo {
+        display: inline-block;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background-size: 32px 35px;
+        background-position: center center;
+        vertical-align: middle;
+        line-height: 32px;
+        box-shadow: inset 0 0 1px #999, inset 0 0 10px rgba(0,0,0,.2);
+        margin-left: 5px;
+    }
+
+    .customer-name {
+        display: inline-block;
+        vertical-align: middle;
+        line-height: 32px;
+        padding-left: 3px;
+    }
